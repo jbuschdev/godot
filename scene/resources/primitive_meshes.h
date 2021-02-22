@@ -323,6 +323,40 @@ public:
 };
 
 /**
+	A donut... er "torus"
+*/
+class TorusMesh : public PrimitiveMesh {
+
+	GDCLASS(TorusMesh, PrimitiveMesh);
+
+private:
+	float inner_radius = 0.5;
+	float outer_radius = 1.0;
+	int radial_segments = 64;
+	int rings = 32;
+
+	static constexpr int MIN_RADIAL_SEGMENTS = 3;
+	static constexpr int MIN_RINGS = 1;
+
+protected:
+	static void _bind_methods();
+	virtual void _create_mesh_array(Array& p_arr) const;
+
+public:
+	void set_inner_radius(const float p_radius);
+	float get_inner_radius() const;
+
+	void set_outer_radius(const float p_radius);
+	float get_outer_radius() const;
+
+	void set_radial_segments(const int p_radial_segments);
+	int get_radial_segments() const;
+
+	void set_rings(const int p_rings);
+	int get_rings() const;
+};
+
+/**
 	A single point for use in particle systems
 */
 

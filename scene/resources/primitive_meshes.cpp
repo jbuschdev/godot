@@ -1573,6 +1573,158 @@ SphereMesh::SphereMesh() {
 	is_hemisphere = false;
 }
 
+
+/**
+  TorusMesh
+*/
+
+void TorusMesh::_create_mesh_array(Array& p_arr) const
+{
+	PoolVector<Vector3> points;
+	PoolVector<Vector3> normals;
+	PoolVector<float> tangents;
+	PoolVector<Vector2> uvs;
+	PoolVector<int> indices;
+
+	constexpr float Pi2 = Math_PI * 2.0f;
+
+	const float tube_radius = (outer_radius - inner_radius) * 0.5f;
+	const float ring_radius = inner_radius + tube_radius;
+
+	int prev_row = 0;
+
+	for (int ring = 0; ring <= (rings + 1); ++ring) {
+		const float y = float(ring) / float(rings + 1);
+
+		const float cos_y = cosf(y * Pi2);
+		const float sin_y = sinf(y * Pi2);
+
+		const int curr_row = points.size();
+
+		for (int segment = 0; segment <= radial_segments; ++segment) {
+
+			const float x = float(segment) / float(radial_segments);
+
+			const float cos_x = cosf(x * Pi2);
+			const float sin_x = sinf(x * Pi2);
+
+			const Vector3 p = Vector3(
+				ring_radius * cos_x + tube_radius * cos_x * cos_y,
+				tube_radius * sin_y,
+				ring_radius * sin_x + tube_radius * sin_x * cos_y
+			);
+
+			const Vector3 normal_dir = Vector3(
+				tube_radius * cos_x * cos_y,
+				tube_radius * sin_y,
+				tube_radius * sin_x * cos_y
+			);
+
+			const Vector3 n = normal_dir.normalized();
+			const Vector2 uv = Vector2(x, y);
+
+			normals.push_back(n);
+			points.push_back(p);
+			uvs.push_back(uv);
+
+			// Compute the tangent by computing a second point slightly in front of our current point.
+			{
+				const float x2 = x + 0.1f;
+
+				const float cos_x2 = cosf(x2 * Pi2);
+				const float sin_x2 = sinf(x2 * Pi2);
+
+				const Vector3 p2 = Vector3(
+					ring_radius * cos_x2 + tube_radius * cos_x2 * cos_y,
+					tube_radius * sin_y,
+					ring_radius * sin_x2 + tube_radius * sin_x2 * cos_y
+				);
+
+				// Orthonormalize the tangent vector
+				const Vector3 tan = (p2 - p);
+				const Vector3 bin = n.cross(tan);
+				const Vector3 t = n.cross(bin).normalized();
+
+				tangents.push_back(t.x);
+				tangents.push_back(t.y);
+				tangents.push_back(t.z);
+				tangents.push_back(1.0f);
+			}
+
+			if (ring > 0 && segment > 0) {
+				indices.push_back(prev_row + segment - 1);
+				indices.push_back(prev_row + segment);
+				indices.push_back(curr_row + segment - 1);
+
+				indices.push_back(prev_row + segment);
+				indices.push_back(curr_row + segment);
+				indices.push_back(curr_row + segment - 1);
+			}
+		}
+
+		prev_row = curr_row;
+	}
+
+	p_arr[VS::ARRAY_VERTEX] = points;
+	p_arr[VS::ARRAY_NORMAL] = normals;
+	p_arr[VS::ARRAY_TANGENT] = tangents;
+	p_arr[VS::ARRAY_TEX_UV] = uvs;
+	p_arr[VS::ARRAY_INDEX] = indices;
+}
+
+void TorusMesh::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_inner_radius", "inner_radius"), &TorusMesh::set_inner_radius);
+	ClassDB::bind_method(D_METHOD("get_inner_radius"), &TorusMesh::get_inner_radius);
+	ClassDB::bind_method(D_METHOD("set_outer_radius", "outer_radius"), &TorusMesh::set_outer_radius);
+	ClassDB::bind_method(D_METHOD("get_outer_radius"), &TorusMesh::get_outer_radius);
+
+	ClassDB::bind_method(D_METHOD("set_radial_segments", "radial_segments"), &TorusMesh::set_radial_segments);
+	ClassDB::bind_method(D_METHOD("get_radial_segments"), &TorusMesh::get_radial_segments);
+	ClassDB::bind_method(D_METHOD("set_rings", "rings"), &TorusMesh::set_rings);
+	ClassDB::bind_method(D_METHOD("get_rings"), &TorusMesh::get_rings);
+
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "inner_radius", PROPERTY_HINT_RANGE, "0.001,100.0,0.001,or_greater"), "set_inner_radius", "get_inner_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "outer_radius", PROPERTY_HINT_RANGE, "0.001,100.0,0.001,or_greater"), "set_outer_radius", "get_outer_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "radial_segments", PROPERTY_HINT_RANGE, "1,100,1,or_greater"), "set_radial_segments", "get_radial_segments");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "rings", PROPERTY_HINT_RANGE, "1,100,1,or_greater"), "set_rings", "get_rings");
+}
+
+void TorusMesh::set_inner_radius(const float p_radius) {
+	inner_radius = p_radius;
+	_request_update();
+}
+
+float TorusMesh::get_inner_radius() const {
+	return inner_radius;
+}
+
+void TorusMesh::set_outer_radius(const float p_radius) {
+	outer_radius = p_radius;
+	_request_update();
+}
+
+float TorusMesh::get_outer_radius() const {
+	return outer_radius;
+}
+
+void TorusMesh::set_radial_segments(const int p_radial_segments) {
+	radial_segments = std::max(p_radial_segments, MIN_RADIAL_SEGMENTS);
+	_request_update();
+}
+
+int TorusMesh::get_radial_segments() const {
+	return radial_segments;
+}
+
+void TorusMesh::set_rings(const int p_rings) {
+	rings = std::max(p_rings, MIN_RINGS);
+	_request_update();
+}
+
+int TorusMesh::get_rings() const {
+	return rings;
+}
+
 /**
   PointMesh
 */
